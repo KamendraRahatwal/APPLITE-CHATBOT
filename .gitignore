@@ -1,0 +1,17 @@
+# Virtual env
+venv/
+
+# Env variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# FAISS + data
+*.index
+*.pkl
+*.xlsx
+
+# VS Code
+.vscode/

@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Applite Solutions - AI Support</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --grad: linear-gradient(135deg, #4F46E5, #7C3AED);
+  --surface: #ffffff;
+  --surface-2: #F9FAFB;
+  --border: #E5E7EB;
+  --text: #111827;
+  --text-2: #6B7280;
+  --text-3: #9CA3AF;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: #f0f2f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+.demo-bg { position: fixed; inset: 0; background: radial-gradient(ellipse at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 50%), #f0f2f8; z-index: 0; }
+.demo-label { position: relative; z-index: 1; text-align: center; pointer-events: none; }
+.demo-label h1 { font-family: 'Sora', sans-serif; font-size: clamp(1.4rem, 4vw, 2.2rem); font-weight: 700; color: #1e1b4b; margin-bottom: 8px; }
+.demo-label p { font-size: 0.95rem; color: #6366f1; font-weight: 500; }
+
+#chat-toggle {
+  position: fixed; bottom: 28px; left: 28px;
+  width: 62px; height: 62px; border-radius: 50%;
+  background: var(--grad); border: none; cursor: pointer; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(79,70,229,0.15);
+  animation: fadeIn 0.4s 0.3s forwards; opacity: 0;
+}
+@keyframes fadeIn { to { opacity: 1; } }
+.toggle-icon { transition: all 0.3s; }
+.toggle-icon.close-icon { position: absolute; opacity: 0; transform: scale(0.5) rotate(-90deg); }
+#chat-toggle.open .chat-icon { opacity: 0; transform: scale(0.5) rotate(90deg); }
+#chat-toggle.open .close-icon { opacity: 1; transform: scale(1) rotate(0deg); }
+
+#chat-window {
+  position: fixed; bottom: 104px; left: 28px;
+  width: 340px; height: 500px;
+  background: var(--surface); border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(79,70,229,0.2);
+  z-index: 9998; display: flex; flex-direction: column; overflow: hidden;
+  transform: scale(0.85) translateY(20px); opacity: 0; pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+#chat-window.open { transform: scale(1) translateY(0); opacity: 1; pointer-events: all; }
+
+.chat-header { background: var(--grad); padding: 14px 16px; display: flex; align-items: center; gap: 10px; }
+.avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; }
+.header-info { flex: 1; }
+.bot-name { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: #fff; }
+.status { font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 2px; }
+
+.chat-messages { flex: 1; overflow-y: auto; padding: 16px; background: var(--surface-2); display: flex; flex-direction: column; gap: 10px; }
+.msg { display: flex; flex-direction: column; max-width: 78%; animation: msgAppear 0.3s; }
+@keyframes msgAppear { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.msg.bot { align-self: flex-start; }
+.msg.user { align-self: flex-end; }
+.bubble { padding: 10px 14px; border-radius: 16px; font-size: 13.5px; line-height: 1.5; }
+.msg.bot .bubble { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.msg.user .bubble { background: var(--grad); color: #fff; }
+.msg-time { font-size: 10px; color: var(--text-3); margin-top: 4px; }
+
+.typing-indicator { display: flex; gap: 4px; padding: 12px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: fit-content; }
+.typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); animation: typingBounce 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+
+.follow-ups { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; animation: msgAppear 0.3s; }
+.follow-up-label { font-size: 11px; color: var(--text-3); font-weight: 600; margin-bottom: 2px; }
+.follow-up-btn {
+  padding: 8px 12px; border-radius: 12px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  color: var(--text-2); font-size: 12px; text-align: left;
+  cursor: pointer; transition: all 0.2s;
+}
+.follow-up-btn:hover { background: #f0f4ff; border-color: #818cf8; color: #4F46E5; }
+
+.chat-input-area { padding: 10px 12px; background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 8px; }
+.chat-input { flex: 1; border: 1.5px solid var(--border); border-radius: 24px; padding: 9px 16px; font-size: 13.5px; outline: none; }
+.chat-input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.send-btn { width: 38px; height: 38px; border-radius: 50%; background: var(--grad); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.chat-footer { height: 58px; background: var(--surface); border-top: 1px solid var(--border); display: flex; padding: 8px 10px; gap: 8px; }
+.footer-btn { flex: 1; height: 38px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; transition: all 0.2s; position: relative; overflow: hidden; }
+.footer-btn::before { content: ''; position: absolute; inset: 0; background: var(--grad); opacity: 0; transition: opacity 0.2s; }
+.footer-btn:hover::before { opacity: 1; }
+.footer-btn:hover { color: #fff; border-color: transparent; }
+.footer-btn svg, .footer-btn span { position: relative; z-index: 1; }
+
+#form-modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  z-index: 10000; display: none; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.25s;
+}
+#form-modal.show { display: flex; opacity: 1; }
+
+.form-container {
+  background: var(--surface); border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.3);
+  width: 90%; max-width: 440px; max-height: 90vh; overflow-y: auto;
+  transform: scale(0.9) translateY(20px);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+#form-modal.show .form-container { transform: scale(1) translateY(0); }
+
+.form-header { background: var(--grad); padding: 20px 24px; border-radius: 16px 16px 0 0; display: flex; align-items: center; justify-content: space-between; }
+.form-header h3 { font-family: 'Sora', sans-serif; color: #fff; font-size: 18px; font-weight: 600; }
+.form-close-btn { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.15); border: none; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+.form-body { padding: 24px; }
+.form-body p { font-size: 13.5px; color: var(--text-2); margin-bottom: 20px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+.required { color: #ef4444; }
+.form-group input,
+.form-group textarea { width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 10px; font-size: 13.5px; font-family: 'DM Sans', sans-serif; outline: none; }
+.form-group input:focus,
+.form-group textarea:focus { border-color: #818cf8; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+.form-group textarea { resize: vertical; min-height: 80px; }
+
+.form-submit-btn { width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--grad); color: #fff; font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.form-submit-btn:hover { transform: translateY(-1px); }
+.form-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.form-success { text-align: center; padding: 40px 24px; }
+.checkmark { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #10b981, #059669); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; animation: successPop 0.5s; }
+@keyframes successPop { from { transform: scale(0); } to { transform: scale(1); } }
+.form-success h4 { font-family: 'Sora', sans-serif; font-size: 20px; margin-bottom: 8px; }
+.form-success p { color: var(--text-2); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<div class="demo-bg"></div>
+<div class="demo-label">
+  <h1>Applite Solutions</h1>
+  <p>AI Support Assistant</p>
+</div>
+
+<button id="chat-toggle">
+  <svg class="toggle-icon chat-icon" width="26" height="26" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+  </svg>
+  <svg class="toggle-icon close-icon" width="22" height="22" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+</button>
+
+<div id="chat-window">
+  <div class="chat-header">
+    <div class="avatar">
+      <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="header-info">
+      <div class="bot-name">Support Assistant</div>
+      <div class="status">Online · Powered by Applite AI</div>
+    </div>
+  </div>
+
+  <div class="chat-messages" id="messages"></div>
+
+  <div class="chat-input-area">
+    <input type="text" class="chat-input" id="input" placeholder="Type your message…" maxlength="500"/>
+    <button class="send-btn" id="send">
+      <svg width="16" height="16" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="chat-footer">
+    <a href="tel:+1234567890" class="footer-btn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4A2 2 0 0 1 3.58 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+      <span>Call Us</span>
+    </a>
+    <a href="mailto:support@applite.com" class="footer-btn">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
+      </svg>
+      <span>Email Us</span>
+    </a>
+  </div>
+</div>
+
+<div id="form-modal">
+  <div class="form-container">
+    <div id="form-state-form">
+      <div class="form-header">
+        <h3>Get in Touch</h3>
+        <button class="form-close-btn" id="form-close">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="form-body">
+        <p>Please share your details and our team will get back to you shortly.</p>
+        <form id="lead-form">
+          <div class="form-group">
+            <label>Name <span class="required">*</span></label>
+            <input type="text" id="form-name" required placeholder="Your full name"/>
+          </div>
+          <div class="form-group">
+            <label>Email <span class="required">*</span></label>
+            <input type="email" id="form-email" required placeholder="your@email.com"/>
+          </div>
+          <div class="form-group">
+            <label>Phone <span class="required">*</span></label>
+            <input type="tel" id="form-phone" required placeholder="+1 234 567 8900"/>
+          </div>
+          <div class="form-group">
+            <label>Company</label>
+            <input type="text" id="form-company" placeholder="Your company (optional)"/>
+          </div>
+          <div class="form-group">
+            <label>Message</label>
+            <textarea id="form-message" placeholder="Tell us more..."></textarea>
+          </div>
+          <input type="hidden" id="form-intent" value="general"/>
+          <button type="submit" class="form-submit-btn" id="form-submit">Submit</button>
+        </form>
+      </div>
+    </div>
+    
+    <div id="form-state-success" style="display:none;">
+      <div class="form-success">
+        <div class="checkmark">
+          <svg width="32" height="32" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h4>Thank You!</h4>
+        <p>We've received your information. Our team will contact you shortly.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'http://localhost:5000/chat';
+const LEAD_URL = 'http://localhost:5000/submit-lead';
+
+const toggle = document.getElementById('chat-toggle');
+const chatWindow = document.getElementById('chat-window');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const messagesEl = document.getElementById('messages');
+
+const formModal = document.getElementById('form-modal');
+const formClose = document.getElementById('form-close');
+const leadForm = document.getElementById('lead-form');
+const formStateForm = document.getElementById('form-state-form');
+const formStateSuccess = document.getElementById('form-state-success');
+
+let isOpen = false;
+let currentIntent = 'general';
+
+toggle.addEventListener('click', function() {
+  isOpen = !isOpen;
+  chatWindow.classList.toggle('open');
+  toggle.classList.toggle('open');
+  if (isOpen && messagesEl.children.length === 0) {
+    showWelcome();
+  }
+});
+
+function showWelcome() {
+  setTimeout(function() {
+    addMessage('bot', '👋 Hello! Welcome to <strong>Applite Solutions</strong>. How can I help you today?');
+    setTimeout(function() {
+      addFollowUps(['What is RCM?', 'Tell me about your IT services', 'What services do you provide?']);
+    }, 300);
+  }, 400);
+}
+
+function addMessage(role, html) {
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + role;
+  msg.innerHTML = '<div class="bubble">' + html + '</div><div class="msg-time">' + new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'}) + '</div>';
+  messagesEl.appendChild(msg);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function addFollowUps(questions) {
+  if (!questions || questions.length === 0) return;
+  
+  const followUpDiv = document.createElement('div');
+  followUpDiv.className = 'follow-ups';
+  followUpDiv.innerHTML = '<div class="follow-up-label">You might also want to know:</div>';
+  
+  questions.forEach(function(q) {
+    const btn = document.createElement('button');
+    btn.className = 'follow-up-btn';
+    btn.textContent = q;
+    btn.onclick = function() {
+      input.value = q;
+      sendMessage();
+    };
+    followUpDiv.appendChild(btn);
+  });
+  
+  messagesEl.appendChild(followUpDiv);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showTyping() {
+  const el = document.createElement('div');
+  el.id = 'typing';
+  el.className = 'typing-indicator';
+  el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function hideTyping() {
+  const el = document.getElementById('typing');
+  if (el) el.remove();
+}
+
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text || sendBtn.disabled) return;
+
+  addMessage('user', text);
+  input.value = '';
+  input.disabled = true;
+  sendBtn.disabled = true;
+  showTyping();
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: text})
+    });
+
+    const data = await res.json();
+    hideTyping();
+    addMessage('bot', data.reply);
+
+    if (data.follow_ups) {
+      addFollowUps(data.follow_ups);
+    }
+
+    if (data.show_form) {
+      setTimeout(function() {
+        openForm(data.intent || 'general');
+      }, 2000);
+    }
+  } catch (err) {
+    hideTyping();
+    addMessage('bot', '⚠️ Connection error. Make sure api.py is running.');
+  }
+
+  input.disabled = false;
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function openForm(intent) {
+  currentIntent = intent || 'general';
+  document.getElementById('form-intent').value = currentIntent;
+  formStateForm.style.display = 'block';
+  formStateSuccess.style.display = 'none';
+  formModal.classList.add('show');
+  setTimeout(function() {
+    document.getElementById('form-name').focus();
+  }, 300);
+}
+
+function closeForm() {
+  formModal.classList.remove('show');
+  leadForm.reset();
+  document.getElementById('form-submit').disabled = false;
+  document.getElementById('form-submit').textContent = 'Submit';
+  formStateForm.style.display = 'block';
+  formStateSuccess.style.display = 'none';
+}
+
+formClose.addEventListener('click', closeForm);
+formModal.addEventListener('click', function(e) {
+  if (e.target === formModal) closeForm();
+});
+
+leadForm.addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = {
+    name: document.getElementById('form-name').value.trim(),
+    email: document.getElementById('form-email').value.trim(),
+    phone: document.getElementById('form-phone').value.trim(),
+    company: document.getElementById('form-company').value.trim(),
+    message: document.getElementById('form-message').value.trim(),
+    intent: currentIntent
+  };
+
+  const submitBtn = document.getElementById('form-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
+
+  try {
+    const res = await fetch(LEAD_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(formData)
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      formStateForm.style.display = 'none';
+      formStateSuccess.style.display = 'block';
+      
+      setTimeout(function() {
+        addMessage('bot', '✅ Thank you for submitting the form! Our team has received your information and will contact you shortly.');
+      }, 100);
+      
+      setTimeout(closeForm, 3000);
+    } else {
+      alert('Error: ' + (data.error || 'Failed to submit'));
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit';
+    }
+  } catch (err) {
+    alert('Connection error. Make sure api.py is running.');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit';
+  }
+});
+</script>
+</body>
+</html>
