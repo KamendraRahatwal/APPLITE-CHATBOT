@@ -6,6 +6,5 @@ faiss-cpu
 pandas
 openpyxl
 torch
-numpy
-pickle
+numpy==1.26.4
 python-dotenv
